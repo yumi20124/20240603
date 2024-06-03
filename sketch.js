@@ -1,54 +1,126 @@
-let leftEye, rightEye; // 儲存左眼和右眼的位置
-let eyeWidth, eyeHeight; // 眼睛範圍的寬度和高度
-let eyeX, eyeY; // 眼睛範圍的左上角位置
+/* MoveNet Skeleton - Steve's Makerspace (most of this code is from TensorFlow)
+
+MoveNet is developed by TensorFlow:
+https://www.tensorflow.org/hub/tutorials/movenet
+
+*/
+
+let video, bodypose, pose, keypoint, detector;
+let poses = [];
+
+async function init() {
+  const detectorConfig = {
+    modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING,
+  };
+  detector = await poseDetection.createDetector(
+    poseDetection.SupportedModels.MoveNet,
+    detectorConfig
+  );
+}
+
+async function videoReady() {
+  console.log("video ready");
+  await getPoses();
+}
+
 async function getPoses() {
   if (detector) {
     poses = await detector.estimatePoses(video.elt, {
       maxPoses: 2,
       //flipHorizontal: true,
     });
-    // 在這裡取得眼睛的位置
-    for (let i = 0; i < poses.length; i++) {
-      pose = poses[i];
-      for (let j = 0; j < pose.keypoints.length; j++) {
-        keypoint = pose.keypoints[j];
-        if (keypoint.name === 'left_eye' || keypoint.name === 'right_eye') {
-          // 將眼睛的位置存儲起來
-          if (keypoint.name === 'left_eye') {
-            leftEye = createVector(keypoint.x, keypoint.y);
-          } else {
-            rightEye = createVector(keypoint.x, keypoint.y);
-          }
-        }
-      }
-    }
   }
   requestAnimationFrame(getPoses);
 }
+
+async function setup() {
+  createCanvas(640, 480);
+  video = createCapture(VIDEO, videoReady);
+  video.size(width, height);
+  video.hide();
+  await init();
+
+  stroke(255);
+  strokeWeight(5);
+}
+
 function draw() {
   image(video, 0, 0);
   drawSkeleton();
-
-  // 更新眼睛範圍的位置
-  if (leftEye && rightEye) {
-    eyeWidth = dist(leftEye.x, leftEye.y, rightEye.x, rightEye.y) * 1.5;
-    eyeHeight = eyeWidth * 0.5;
-    eyeX = (leftEye.x + rightEye.x) / 2 - eyeWidth / 2;
-    eyeY = (leftEye.y + rightEye.y) / 2 - eyeHeight / 2;
-  }
-
-  // 繪製眼睛範圍
-  if (eyeWidth && eyeHeight) {
-    noFill();
-    stroke(255, 0, 0);
-    strokeWeight(2);
-    rect(eyeX, eyeY, eyeWidth, eyeHeight);
-  }
-
-  // 翻轉影像
+  // flip horizontal
   cam = get();
   translate(cam.width, 0);
   scale(-1, 1);
   image(cam, 0, 0);
 }
 
+function drawSkeleton() {
+  // Draw all the tracked landmark points
+  for (let i = 0; i < poses.length; i++) {
+    pose = poses[i];
+    // shoulder to wrist
+    for (j = 5; j < 9; j++) {
+      if (pose.keypoints[j].score > 0.1 && pose.keypoints[j + 2].score > 0.1) {
+        partA = pose.keypoints[j];
+        partB = pose.keypoints[j + 2];
+        line(partA.x, partA.y, partB.x, partB.y);
+      }
+    }
+    // shoulder to shoulder
+    partA = pose.keypoints[5];
+    partB = pose.keypoints[6];
+    if (partA.score > 0.1 && partB.score > 0.1) {
+      line(partA.x, partA.y, partB.x, partB.y);
+      
+    }
+    // hip to hip
+    partA = pose.keypoints[11];
+    partB = pose.keypoints[12];
+    if (partA.score > 0.1 && partB.score > 0.1) {
+      line(partA.x, partA.y, partB.x, partB.y);
+      
+    }
+    // shoulders to hips
+    partA = pose.keypoints[5];
+    partB = pose.keypoints[11];
+    if (partA.score > 0.1 && partB.score > 0.1) {
+      line(partA.x, partA.y, partB.x, partB.y);
+      
+    }
+    partA = pose.keypoints[6];
+    partB = pose.keypoints[12];
+    if (partA.score > 0.1 && partB.score > 0.1) {
+      line(partA.x, partA.y, partB.x, partB.y);
+      
+    }
+    // hip to foot
+    for (j = 11; j < 15; j++) {
+      if (pose.keypoints[j].score > 0.1 && pose.keypoints[j + 2].score > 0.1) {
+        partA = pose.keypoints[j];
+        partB = pose.keypoints[j + 2];
+        line(partA.x, partA.y, partB.x, partB.y);
+        
+      }
+    }
+  }
+}
+
+/* Points (view on left of screen = left part - when mirrored)
+  0 nose
+  1 left eye
+  2 right eye
+  3 left ear
+  4 right ear
+  5 left shoulder
+  6 right shoulder
+  7 left elbow
+  8 right elbow
+  9 left wrist
+  10 right wrist
+  11 left hip
+  12 right hip
+  13 left kneee
+  14 right knee
+  15 left foot
+  16 right foot
+*/
